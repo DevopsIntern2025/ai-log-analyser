@@ -1,5 +1,9 @@
 from fastapi import FastAPI
 from app.core.config import settings
+from app.db.database import Base, engine
+from app.db import base
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -7,13 +11,11 @@ app = FastAPI(
     version=settings.APP_VERSION,
 )
 
-
 @app.get("/")
 def root():
     return {
         "message": "Welcome to AI Log Analyzer 🚀"
     }
-
 
 @app.get("/health")
 def health():
