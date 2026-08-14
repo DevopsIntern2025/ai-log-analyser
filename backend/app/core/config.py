@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
 
+    MAX_UPLOAD_SIZE_MB: int = 5
+    ALLOWED_LOG_EXTENSIONS: set[str] = {".log", ".txt"}
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,

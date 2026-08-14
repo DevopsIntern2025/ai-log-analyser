@@ -1,0 +1,47 @@
+from fastapi import APIRouter, Depends, File, UploadFile
+
+from sqlalchemy.orm import Session
+
+from app.api.v1.auth import get_current_user
+from app.models.user import User
+from app.services.log_service import save_log_file
+from app.db.database import get_db
+from app.models.log_file import LogFile
+
+
+router = APIRouter(
+    prefix="/logs",
+    tags=["Logs"],
+)
+
+
+@router.post("/upload")
+async def upload_log(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    result = await save_log_file(file)
+
+    log_file = LogFile(
+        user_id=current_user.id,
+        original_filename=result["original_filename"],
+        stored_filename=result["stored_filename"],
+        file_path=result["file_path"],
+        file_size=result["file_size"],
+        status="uploaded",
+    )
+
+    db.add(log_file)
+    db.commit()
+    db.refresh(log_file)
+
+    return {
+        "message": "Log uploaded successfully",
+        "log_id": log_file.id,
+        "user_id": current_user.id,
+        "original_filename": log_file.original_filename,
+        "stored_filename": log_file.stored_filename,
+        "file_size": log_file.file_size,
+        "status": log_file.status,
+    }

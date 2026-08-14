@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 from fastapi import HTTPException, status
-from jose import jwt
+from jose import JWTError, jwt
 
 from app.core.config import settings
 
