@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
+from fastapi import HTTPException, status
 
 from app.api.v1.auth import get_current_user
 from app.models.user import User
 from app.services.log_service import save_log_file
 from app.db.database import get_db
 from app.models.log_file import LogFile
+from app.services.log_parser import parse_log_content
 
 
 router = APIRouter(
@@ -75,4 +77,48 @@ def get_user_logs(
             }
             for log in logs
         ],
+    }
+
+@router.get("/{log_id}/parsed")
+def parse_uploaded_log(
+    log_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    log_file = (
+        db.query(LogFile)
+        .filter(
+            LogFile.id == log_id,
+            LogFile.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not log_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Log file not found",
+        )
+
+    try:
+        with open(
+            log_file.file_path,
+            "r",
+            encoding="utf-8",
+        ) as file:
+            content = file.read()
+
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Physical log file not found",
+        )
+
+    parsed_logs = parse_log_content(content)
+
+    return {
+        "log_id": log_file.id,
+        "filename": log_file.original_filename,
+        "count": len(parsed_logs),
+        "logs": parsed_logs,
     }
