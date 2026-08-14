@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, File, UploadFile
-
 from sqlalchemy.orm import Session
 
 from app.api.v1.auth import get_current_user
@@ -44,4 +43,36 @@ async def upload_log(
         "stored_filename": log_file.stored_filename,
         "file_size": log_file.file_size,
         "status": log_file.status,
+    }
+
+@router.get("")
+def get_user_logs(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    logs = (
+        db.query(LogFile)
+        .filter(
+            LogFile.user_id == current_user.id
+        )
+        .order_by(
+            LogFile.created_at.desc()
+        )
+        .all()
+    )
+
+    return {
+        "user_id": current_user.id,
+        "count": len(logs),
+        "logs": [
+            {
+                "id": log.id,
+                "original_filename": log.original_filename,
+                "stored_filename": log.stored_filename,
+                "file_size": log.file_size,
+                "status": log.status,
+                "created_at": log.created_at,
+            }
+            for log in logs
+        ],
     }
