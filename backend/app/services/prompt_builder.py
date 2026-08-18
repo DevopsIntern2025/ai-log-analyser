@@ -43,7 +43,30 @@ Logs:
 {formatted_logs}
 --------------------
 
-Provide a concise DevOps-focused analysis.
+Return the analysis as valid JSON using exactly this structure:
+
+{{
+  "severity": "LOW | MEDIUM | HIGH | CRITICAL",
+  "summary": "Short summary of the problem",
+  "root_cause": "Likely root cause based on the evidence",
+  "evidence": [
+    "Important evidence from the logs"
+  ],
+  "recommendations": [
+    "Actionable remediation step"
+  ],
+  "risk": "Potential impact if the issue remains unresolved",
+  "confidence": 0.0
+}}
+
+Rules:
+- Return JSON only.
+- Do not use Markdown code fences.
+- Do not add explanations before or after the JSON.
+- Confidence must be between 0 and 1.
+- Base the analysis only on the provided logs.
+- Do not invent facts.
+- If the root cause cannot be determined, clearly state that more information is required.
 """
 
     return prompt.strip()
