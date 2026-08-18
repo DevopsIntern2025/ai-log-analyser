@@ -30,17 +30,34 @@ async def generate_text(prompt: str) -> str:
     }
 
     async with httpx.AsyncClient(
-        timeout=60.0
+     timeout=60.0
     ) as client:
-
+     try:
         response = await client.post(
             GEMINI_URL,
             headers=headers,
             json=payload,
         )
+     except httpx.TimeoutException as exc:
+        raise RuntimeError(
+            "Gemini API request timed out"
+        ) from exc
+     except httpx.RequestError as exc:
+        raise RuntimeError(
+            "Unable to connect to Gemini API"
+        ) from exc
 
-    response.raise_for_status()
+    if response.status_code != 200:
+     raise RuntimeError(
+        f"Gemini API request failed: "
+        f"{response.status_code} - {response.text}"
+     )
 
     data = response.json()
 
-    return data["candidates"][0]["content"]["parts"][0]["text"]
+    try:
+     return data["candidates"][0]["content"]["parts"][0]["text"]
+    except (KeyError, IndexError, TypeError) as exc:
+     raise RuntimeError(
+        "Unexpected response received from Gemini API"
+     ) from exc
