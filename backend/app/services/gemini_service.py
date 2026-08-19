@@ -1,11 +1,21 @@
 import httpx
 import json
+import asyncio
 
 from app.core.config import settings
 from app.schemas.ai_schema import AIAnalysis
+from app.core.ai_exceptions import (
+    AIConnectionError,
+    AITimeoutError,
+    AIRateLimitError,
+    AIProviderError,
+    AIResponseError,
+)
 
 
 GEMINI_MODEL = "gemini-3.6-flash"
+MAX_RETRIES = 3
+INITIAL_RETRY_DELAY = 1
 
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com"
@@ -30,6 +40,83 @@ async def generate_text(prompt: str) -> str:
             }
         ]
     }
+    for attempt in range(MAX_RETRIES):
+        try:
+            async with httpx.AsyncClient(
+                timeout=60.0
+            ) as client:
+
+                response = await client.post(
+                    GEMINI_URL,
+                    headers=headers,
+                    json=payload,
+                )
+
+        except httpx.TimeoutException as exc:
+
+            if attempt < MAX_RETRIES - 1:
+                delay = INITIAL_RETRY_DELAY * (2 ** attempt)
+                await asyncio.sleep(delay)
+                continue
+
+            raise AITimeoutError(
+                "Gemini API request timed out after retries"
+            ) from exc
+
+        except httpx.RequestError as exc:
+
+            if attempt < MAX_RETRIES - 1:
+                delay = INITIAL_RETRY_DELAY * (2 ** attempt)
+                await asyncio.sleep(delay)
+                continue
+
+            raise AIConnectionError(
+                "Unable to connect to Gemini API after retries"
+            ) from exc
+
+        if response.status_code == 429:
+
+            if attempt < MAX_RETRIES - 1:
+                delay = INITIAL_RETRY_DELAY * (2 ** attempt)
+                await asyncio.sleep(delay)
+                continue
+
+            raise AIRateLimitError(
+                "Gemini API rate limit exceeded"
+            )
+
+        if 500 <= response.status_code < 600:
+
+            if attempt < MAX_RETRIES - 1:
+                delay = INITIAL_RETRY_DELAY * (2 ** attempt)
+                await asyncio.sleep(delay)
+                continue
+
+            raise AIProviderError(
+                f"Gemini provider error: "
+                f"{response.status_code}"
+            )
+
+        if response.status_code != 200:
+            raise AIProviderError(
+                f"Gemini API request failed: "
+                f"{response.status_code}"
+            )
+
+        data = response.json()
+
+        try:
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+
+        except (KeyError, IndexError, TypeError) as exc:
+            raise AIResponseError(
+                "Unexpected response received from Gemini API"
+            ) from exc
+
+    raise AIProviderError(
+        "Gemini API request failed after retries"
+    )
+
 
     async with httpx.AsyncClient(
      timeout=60.0
@@ -80,7 +167,7 @@ def parse_gemini_json(response_text: str) -> dict:
         return json.loads(cleaned_response)
 
     except json.JSONDecodeError as exc:
-        raise RuntimeError(
+        raise AIResponseError(
             "Gemini returned invalid JSON"
         ) from exc
 
@@ -91,8 +178,8 @@ def validate_ai_analysis(
         return AIAnalysis.model_validate(data)
 
     except Exception as exc:
-        raise RuntimeError(
-            "Gemini response failed AIAnalysis validation"
+        raise AIResponseError(
+    "Gemini response failed AIAnalysis validation"
         ) from exc
 
 async def generate_analysis(
