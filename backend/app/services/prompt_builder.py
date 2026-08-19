@@ -3,6 +3,7 @@ from typing import Any
 
 def build_log_analysis_prompt(
     logs: list[dict[str, Any]],
+    error_summary: str = "",
 ) -> str:
 
     log_lines = []
@@ -19,6 +20,7 @@ def build_log_analysis_prompt(
     formatted_logs = "\n".join(log_lines)
 
     prompt = f"""
+
 You are an expert DevOps incident analysis assistant.
 
 Analyze the following application logs.
@@ -37,6 +39,8 @@ Rules:
 - Clearly distinguish evidence from assumptions.
 - Focus on actionable recommendations.
 - If the logs do not provide enough information to determine the root cause, say so.
+
+{error_summary}
 
 Logs:
 --------------------
@@ -91,6 +95,7 @@ def filter_relevant_logs(
 
 def build_analysis_prompt(
     logs: list[dict[str, Any]],
+    error_analysis: dict,
 ) -> str:
 
     relevant_logs = filter_relevant_logs(logs)
@@ -100,7 +105,25 @@ def build_analysis_prompt(
             "No ERROR, WARN, WARNING, or CRITICAL "
             "events were found in the provided logs."
         )
+    
+    error_summary = f"""
+Deterministic Error Analysis
+----------------------------
+
+Total logs: {error_analysis["total_logs"]}
+Errors: {error_analysis["error_count"]}
+Warnings: {error_analysis["warning_count"]}
+
+Top Errors:
+"""
+
+    for error in error_analysis["top_errors"]:
+        error_summary += (
+            f'- {error["message"]} '
+            f'(Occurrences: {error["count"]})\n'
+    )
 
     return build_log_analysis_prompt(
-        relevant_logs
+        relevant_logs,
+        error_summary,
     )

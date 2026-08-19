@@ -4,6 +4,7 @@ from app.models.log_file import LogFile
 from app.services.log_parser import parse_log_content
 from app.services.prompt_builder import build_analysis_prompt
 from app.services.gemini_service import generate_analysis
+from app.services.error_analyzer import analyze_errors
 
 
 async def analyze_log(
@@ -20,6 +21,8 @@ async def analyze_log(
 
     parsed_logs = parse_log_content(content)
 
+    error_analysis = analyze_errors(parsed_logs)
+
     if not parsed_logs:
         return {
             "log_id": log_file.id,
@@ -28,7 +31,7 @@ async def analyze_log(
             "analysis": None,
         }
 
-    prompt = build_analysis_prompt(parsed_logs)
+    prompt = build_analysis_prompt(parsed_logs,error_analysis,)
 
     analysis = await generate_analysis(prompt)
 
