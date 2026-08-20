@@ -4,6 +4,8 @@ from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 
 from app.db.database import Base
 
+from sqlalchemy.orm import relationship
+
 
 class LogFile(Base):
     __tablename__ = "log_files"
@@ -52,4 +54,10 @@ class LogFile(Base):
         DateTime,
         default=datetime.utcnow,
         nullable=False,
+    )
+
+    analyses = relationship(
+    "AIAnalysis",
+    back_populates="log_file",
+    cascade="all, delete-orphan",
     )
